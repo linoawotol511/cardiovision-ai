@@ -297,7 +297,7 @@ def create_pdf_report(report, fig, logo_path=logo_file):
     story.append(Spacer(1, 0.45 * inch))
 
     cover_box = Table(
-        [[Paragraph("CREATIVE HEALTH REPORT TEMPLATE", ParagraphStyle(
+        [[Paragraph("CARDIO AI HEALTH REPORT", ParagraphStyle(
             "CoverBoxText",
             parent=styles["Normal"],
             fontName="Helvetica-Bold",
@@ -647,7 +647,7 @@ elif st.session_state.page == "form":
         prediction = model.predict(patient_data)[0]
         probability = model.predict_proba(patient_data)[0][1] * 100
 
-        current_date = datetime.now().strftime("%Y-%m-%d")
+        current_date = datetime.now().strftime("%d-%m-%Y")
         current_time = datetime.now().strftime("%H:%M:%S")
         patient_id = str(uuid.uuid4())[:8].upper()
 

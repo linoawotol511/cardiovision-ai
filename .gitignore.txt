@@ -1,0 +1,3 @@
+CardioVision_AI_Report.pdf
+.ipynb_checkpoints/
+*.ipynb
