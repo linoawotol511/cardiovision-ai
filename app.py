@@ -5,8 +5,8 @@ import base64
 import matplotlib.pyplot as plt
 import numpy as np
 import tempfile
-import os
-from datetime import date
+import uuid
+from datetime import datetime, date
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 
@@ -37,13 +37,13 @@ if "report_data" not in st.session_state:
 # -----------------------------
 # Logo Loader
 # -----------------------------
+logo_file = "logo.jpeg"   # change to "logo.jpg" if needed
+
 def get_base64_image(image_file):
     with open(image_file, "rb") as f:
         data = f.read()
     return base64.b64encode(data).decode()
 
-# Change this if your file is logo.jpg
-logo_file = "logo.jpeg"
 logo_base64 = get_base64_image(logo_file)
 
 # -----------------------------
@@ -213,6 +213,12 @@ def blue_section_heading(text, width=520, height=22):
     return table
 
 
+def add_page_header(canvas, doc, patient_id):
+    canvas.setFont("Helvetica-Bold", 10)
+    canvas.setFillColor(colors.HexColor("#1E88E5"))
+    canvas.drawString(40, A4[1] - 30, f"Patient ID: {patient_id}")
+
+
 def create_pdf_report(report, fig, logo_path=logo_file):
     graph_file = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
     fig.savefig(graph_file.name, bbox_inches="tight", dpi=200)
@@ -225,7 +231,7 @@ def create_pdf_report(report, fig, logo_path=logo_file):
         pagesize=A4,
         rightMargin=40,
         leftMargin=40,
-        topMargin=40,
+        topMargin=50,
         bottomMargin=40
     )
 
@@ -271,7 +277,9 @@ def create_pdf_report(report, fig, logo_path=logo_file):
 
     story = []
 
-    # Cover page
+    # -----------------------------
+    # COVER PAGE
+    # -----------------------------
     story.append(Spacer(1, 0.3 * inch))
     story.append(RLImage(circular_logo_path, width=1.5 * inch, height=1.5 * inch))
     story.append(Spacer(1, 0.25 * inch))
@@ -280,14 +288,16 @@ def create_pdf_report(report, fig, logo_path=logo_file):
     story.append(Paragraph("An Intelligent Cardiovascular Risk Prediction and Analysis System", subtitle_style))
 
     story.append(Spacer(1, 0.25 * inch))
+    story.append(Paragraph(f"<b>Patient ID:</b> {report['patient_id']}", normal_style))
     story.append(Paragraph(f"<b>Patient Name:</b> {report['patient_name']}", normal_style))
-    story.append(Paragraph(f"<b>Date of Analysis:</b> {date.today()}", normal_style))
+    story.append(Paragraph(f"<b>Date of Analysis:</b> {report['current_date']}", normal_style))
+    story.append(Paragraph(f"<b>Time of Data Collection:</b> {report['current_time']}", normal_style))
     story.append(Spacer(1, 0.15 * inch))
     story.append(Paragraph("<b>Prepared by:</b> James Ntiamoah & Kelvin Awotol", normal_style))
     story.append(Spacer(1, 0.45 * inch))
 
     cover_box = Table(
-        [[Paragraph("CREATIVE   HEALTH   REPORT", ParagraphStyle(
+        [[Paragraph("CREATIVE HEALTH REPORT TEMPLATE", ParagraphStyle(
             "CoverBoxText",
             parent=styles["Normal"],
             fontName="Helvetica-Bold",
@@ -313,9 +323,11 @@ def create_pdf_report(report, fig, logo_path=logo_file):
     ))
     story.append(PageBreak())
 
-    # Patient information
+    # -----------------------------
+    # PATIENT INFORMATION PAGE
+    # -----------------------------
     story.append(blue_section_heading("PATIENT INFORMATION"))
-    story.append(Spacer(1, 0.15 * inch))
+    story.append(Spacer(1, 0.2 * inch))
 
     patient_table_data = [
         ["Health Indicator", "Value"],
@@ -362,7 +374,8 @@ def create_pdf_report(report, fig, logo_path=logo_file):
         ["Predicted Cardiovascular Risk", f"{round(report['probability'], 2)}%"],
         ["Risk Classification", report["category"]],
         ["Prediction", prediction_text],
-        ["Date of Analysis", str(date.today())],
+        ["Date of Analysis", str(report["current_date"])],
+        ["Time of Data Collection", str(report["current_time"])],
     ]
 
     summary_table = Table(summary_table_data, colWidths=[230, 230])
@@ -379,7 +392,9 @@ def create_pdf_report(report, fig, logo_path=logo_file):
     story.append(summary_table)
     story.append(PageBreak())
 
-    # Explanations / Recommendations / Advisory
+    # -----------------------------
+    # EXPLANATION / RECOMMENDATIONS / ADVISORY
+    # -----------------------------
     story.append(blue_section_heading("RISK EXPLANATION"))
     story.append(Spacer(1, 0.12 * inch))
     for item in report["explanations"]:
@@ -402,7 +417,9 @@ def create_pdf_report(report, fig, logo_path=logo_file):
 
     story.append(PageBreak())
 
-    # Graph page
+    # -----------------------------
+    # GRAPH PAGE
+    # -----------------------------
     story.append(blue_section_heading("PATIENT GRAPH COMPARISON"))
     story.append(Spacer(1, 0.2 * inch))
     story.append(RLImage(graph_file.name, width=6.3 * inch, height=3.8 * inch))
@@ -416,7 +433,13 @@ def create_pdf_report(report, fig, logo_path=logo_file):
     story.append(Spacer(1, 0.3 * inch))
     story.append(Paragraph("CardioVision AI | Done by James & Kelvin", small_gray))
 
-    doc.build(story)
+    def first_page(canvas, doc):
+        pass
+
+    def later_pages(canvas, doc):
+        add_page_header(canvas, doc, report["patient_id"])
+
+    doc.build(story, onFirstPage=first_page, onLaterPages=later_pages)
     return pdf_file
 
 
@@ -624,8 +647,15 @@ elif st.session_state.page == "form":
         prediction = model.predict(patient_data)[0]
         probability = model.predict_proba(patient_data)[0][1] * 100
 
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        current_time = datetime.now().strftime("%H:%M:%S")
+        patient_id = str(uuid.uuid4())[:8].upper()
+
         st.session_state.report_data = {
+            "patient_id": patient_id,
             "patient_name": patient_name,
+            "current_date": current_date,
+            "current_time": current_time,
             "age": age,
             "sex": sex,
             "cp": cp,
@@ -651,8 +681,10 @@ elif st.session_state.page == "form":
         report = st.session_state.report_data
 
         st.subheader("CardioVision AI Health Report")
+        st.write("Patient ID:", report["patient_id"])
         st.write("Patient Name:", report["patient_name"])
-        st.write("Date of Analysis:", date.today())
+        st.write("Date of Analysis:", report["current_date"])
+        st.write("Time of Data Collection:", report["current_time"])
         st.write("Predicted Cardiovascular Risk:", round(report["probability"], 2), "%")
         st.write("Risk Classification:", report["category"])
 
